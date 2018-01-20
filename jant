@@ -1,0 +1,142 @@
+#!/bin/sh
+
+#############################################################################
+# Author : Milo Shaw  milo@deepsupport.org | milo@newlisp.cn |
+# Update : 2018-01-20 12:26:08
+#############################################################################
+
+ANT=/usr/local/bin/ant
+SED=/usr/bin/sed
+DIRNAME=/usr/bin/dirname
+BASENAME=/usr/bin/basename
+MD=/bin/mkdir
+
+BUILD_FILE="build.xml"
+CODE_DIR="src"
+LIBRARY_DIR="lib"
+
+#############################################################################
+# PROJECT_BUILD_FILE                                                        #
+#============================================================================
+# <project name="PROJECTNAME" basedir="." default="main">
+
+#     <property name="src.dir" value="src"/>
+#     <property name="build.dir" value="build"/>
+#     <property name="classes.dir" value="${build.dir}/classes"/>
+#     <property name="jar.dir" value="${build.dir}/jar"/>
+#     <property name="main-class" value="cn.newlisp.PROJECTNAME"/>
+
+#     <property name="lib.dir" value="lib"/>
+#     <path id="classpath">
+#         <fileset dir="${lib.dir}" includes="**/*.jar"/>
+#     </path>
+
+#     <target name="clean">
+#         <delete dir="${build.dir}"/>
+#     </target>
+#     <target name="compile">
+#         <mkdir dir="${classes.dir}"/>
+#         <javac srcdir="${src.dir}" destdir="${classes.dir}" classpathref="classpath" includeantruntime="on"/>
+#     </target>
+#     <target name="jar">
+#         <mkdir dir="${jar.dir}"/>
+#         <jar destfile="${jar.dir}/${ant.project.name}.jar" basedir="${classes.dir}">
+#             <manifest>
+#                 <attribute name="Main-Class" value="${main-class}"/>
+#             </manifest>
+#         </jar>
+#     </target>
+#     <target name="run" depends="jar">
+#         <java classname="${main-class}" fork="true">
+#             <classpath>
+#                 <path refid="classpath"/>
+#                 <path location="${jar.dir}/${ant.project.name}.jar"/>
+#             </classpath>
+#         </java>
+#     </target>
+
+#     <target name="clean-build" depends="clean,jar"/>
+#     <target name="main" depends="clean,run"/>
+
+# </project>
+#############################################################################
+
+find_compile_and_run(){
+
+    if [ -x ${ANT} ];then
+        until [ $(pwd) = "/" ];
+        do
+            if [ -s $(pwd)/$BUILD_FILE ];then
+                ${ANT} compile -buildfile $(pwd)/$BUILD_FILE
+                ${ANT} run -buildfile $(pwd)/$BUILD_FILE
+                exit 0;
+            else
+                cd ..
+            fi
+        done
+    else
+        echo "You need install apache ant first !"
+    fi
+}
+
+filter_param(){
+
+    if [ -n "$1" ]; then
+        echo ${1} | ${SED} -E -e "s/([\[\=\"\'\(\{\:]+)//;s/([]\;\}\)\,\"\']+)//;s/-/_/g";
+    fi
+}
+
+generate_build_file(){
+
+    if [ ! -f $BUILD_FILE ] && [ -n "$1" ] && [ -w $(${DIRNAME} ${1}) ] && [ -n "$2" ];then
+        ${SED} -n "/^#.PROJECT\_BUILD\_FILE.*\#$/,/^#.*\#$/p" < $2 | ${SED} "/^#.PROJECT\_BUILD\_FILE.*\#$/,/^#.*\=$/d;/^#.*\#$/d;s/^#.//g;s/PROJECTNAME/$(${BASENAME} ${1})/;" > $BUILD_FILE
+    fi
+}
+
+create_project_with_name(){
+
+    if [ -n "$1" ];then
+        local project_name=$(filter_param $1);
+        local build_file_src=$(pwd)/$(${BASENAME} $0)
+        if [ -n "$project_name" ] && [ ! -d $project_name ] && [ -w $(${DIRNAME} ${project_name}) ];then
+            # create project directory 
+            ${MD} $project_name
+
+            cd $project_name
+            # create src lib sub-directories
+            ${MD} ${CODE_DIR}
+            ${MD} ${LIBRARY_DIR}
+
+            # generate project build configure file: $BUILD_FILE
+            generate_build_file $project_name $build_file_src
+
+            if [ -x /usr/local/bin/tree ] || [ -x /usr/bin/tree ];then
+                tree .
+            fi
+        fi
+    fi
+}
+
+usge_help(){
+    echo "======================================================================="
+    echo "=         Autonamic Create Java Project and Compile and Run           ="
+    echo "======================================================================="
+    echo "=  create project : jant -n your_project_name                         ="
+    echo "=  compile and run: jant                                              ="
+    echo "=  show help info : jant -h                                           ="
+    echo "======================================================================="
+    exit 1
+}
+
+# self checked and launch...
+if [ $# -le 0 ];then
+    find_compile_and_run
+else
+    if [ "$1" = "-h" ];then
+        usge_help
+    else
+        if [ "$1" = "-n" ] && [ -n "$2" ];then
+            create_project_with_name $2
+        fi
+    fi
+fi
