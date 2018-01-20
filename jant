@@ -88,8 +88,8 @@ filter_param(){
 
 generate_build_file(){
 
-    if [ ! -f $BUILD_FILE ] && [ -n "$1" ] && [ -w $(${DIRNAME} ${1}) ] && [ -n "$2" ];then
-        ${SED} -n "/^#.PROJECT\_BUILD\_FILE.*\#$/,/^#.*\#$/p" < $2 | ${SED} "/^#.PROJECT\_BUILD\_FILE.*\#$/,/^#.*\=$/d;/^#.*\#$/d;s/^#.//g;s/PROJECTNAME/$(${BASENAME} ${1})/;" > $BUILD_FILE
+    if [ ! -f $BUILD_FILE ] && [ -n "$1" ] && [ -w $(${DIRNAME} ${1}) ]; then
+        ${SED} -n "/^#.PROJECT\_BUILD\_FILE.*\#$/,/^#.*\#$/p" < $0 | ${SED} "/^#.PROJECT\_BUILD\_FILE.*\#$/,/^#.*\=$/d;/^#.*\#$/d;s/^#.//g;s/PROJECTNAME/$(${BASENAME} ${1})/;" > $BUILD_FILE
     fi
 }
 
@@ -97,7 +97,6 @@ create_project_with_name(){
 
     if [ -n "$1" ];then
         local project_name=$(filter_param $1);
-        local build_file_src=$(pwd)/$(${BASENAME} $0)
         if [ -n "$project_name" ] && [ ! -d $project_name ] && [ -w $(${DIRNAME} ${project_name}) ];then
             # create project directory 
             ${MD} $project_name
@@ -108,7 +107,7 @@ create_project_with_name(){
             ${MD} ${LIBRARY_DIR}
 
             # generate project build configure file: $BUILD_FILE
-            generate_build_file $project_name $build_file_src
+            generate_build_file $project_name 
 
             if [ -x /usr/local/bin/tree ] || [ -x /usr/bin/tree ];then
                 tree .
@@ -128,7 +127,22 @@ usge_help(){
     exit 1
 }
 
+environment_check(){
+
+    if [ -f $0 ] && [ $(${DIRNAME} $0) = "." ];then
+        local position=$(pwd)/$(${BASENAME} $0)
+        chmod 755 $position;
+        if [ $(id -u) -ne 0 ];then
+            sudo mv $position /usr/local/bin/
+        else
+            mv $position /usr/local/bin/
+        fi 
+        usge_help
+    fi 
+}
+
 # self checked and launch...
+environment_check
 if [ $# -le 0 ];then
     find_compile_and_run
 else
