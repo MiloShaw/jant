@@ -14,52 +14,83 @@ MD=/bin/mkdir
 BUILD_FILE="build.xml"
 CODE_DIR="src"
 LIBRARY_DIR="lib"
+TEST_DIR="test"
 
 #############################################################################
 # PROJECT_BUILD_FILE                                                        #
 #============================================================================
 # <project name="PROJECTNAME" basedir="." default="main">
 
-#     <property name="src.dir" value="src"/>
-#     <property name="build.dir" value="build"/>
-#     <property name="classes.dir" value="${build.dir}/classes"/>
-#     <property name="jar.dir" value="${build.dir}/jar"/>
-#     <property name="main-class" value="cn.newlisp.PROJECTNAME"/>
+#    <property name="src.dir" value="src"/>
+#    <property name="build.dir" value="build"/>
+#    <property name="test.dir" value="test"/>
+#    <property name="report.dir" value="report"/>
+#    <property name="classes.dir" value="${build.dir}/classes"/>
+#    <property name="jar.dir" value="${build.dir}/jar"/>
+#    <property name="main-class" value="ORGNIZATION.PROJECTNAME"/>
 
-#     <property name="lib.dir" value="lib"/>
-#     <path id="classpath">
-#         <fileset dir="${lib.dir}" includes="**/*.jar"/>
-#     </path>
+#    <property name="lib.dir" value="lib"/>
+#    <path id="classpath">
+#        <fileset dir="${lib.dir}" includes="**/*.jar"/>
+#    </path>
 
-#     <target name="clean">
-#         <delete dir="${build.dir}"/>
-#     </target>
-#     <target name="compile">
-#         <mkdir dir="${classes.dir}"/>
-#         <javac srcdir="${src.dir}" destdir="${classes.dir}" classpathref="classpath" includeantruntime="on"/>
-#     </target>
-#     <target name="jar">
-#         <mkdir dir="${jar.dir}"/>
-#         <jar destfile="${jar.dir}/${ant.project.name}.jar" basedir="${classes.dir}">
-#             <manifest>
-#                 <attribute name="Main-Class" value="${main-class}"/>
-#             </manifest>
-#         </jar>
-#     </target>
-#     <target name="run" depends="jar">
-#         <java classname="${main-class}" fork="true">
-#             <classpath>
-#                 <path refid="classpath"/>
-#                 <path location="${jar.dir}/${ant.project.name}.jar"/>
-#             </classpath>
-#         </java>
-#     </target>
+#    <target name="clean">
+#        <delete dir="${build.dir}"/>
+#        <delete dir="${report.dir}"/>
+#    </target>
+#    <target name="compile">
+#        <mkdir dir="${classes.dir}"/>
+#        <javac srcdir="${src.dir}" destdir="${classes.dir}" classpathref="classpath" includeantruntime="on"/>
+#    </target>
+#    <target name="jar">
+#        <mkdir dir="${jar.dir}"/>
+#        <jar destfile="${jar.dir}/${ant.project.name}.jar" basedir="${classes.dir}">
+#            <manifest>
+#                <attribute name="Main-Class" value="${main-class}"/>
+#            </manifest>
+#        </jar>
+#    </target>
+#    <path id="application" location="${jar.dir}/${ant.project.name}.jar"/>
+#    <target name="run" depends="jar">
+#        <java classname="${main-class}" fork="true">
+#            <classpath>
+#                <path refid="classpath"/>
+#                <path refid="application"/>
+#            </classpath>
+#        </java>
+#    </target>
+#    <target name="junit" depends="jar">
+#        <mkdir dir="${report.dir}"/>           
+#        <junit printsummary="yes" haltonfailure="no">
+#            <classpath>
+#                <path refid="classpath"/>
+#                <path refid="application"/>
+#            </classpath>
+#            <formatter type="xml"/>
+#            <formatter type="plain"/>
+#            <batchtest fork="yes" todir="${report.dir}">
+#                <fileset dir="${test.dir}" includes="**/*Test*.java"/>
+#            </batchtest>
+#        </junit>
+#    </target>
 
-#     <target name="clean-build" depends="clean,jar"/>
-#     <target name="main" depends="clean,run"/>
+#    <target name="clean-build" depends="clean,jar"/>
+#    <target name="main" depends="clean,run"/>
 
 # </project>
 #############################################################################
+
+#++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+# JAVA_HERE                                                                 #
+#++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+#public class PROJECTNAME {
+#
+#    public static void main(String[] args) {
+#        System.out.println("Hi, jant!");
+#    }
+#}
+#============================================================================
 
 find_compile_and_run(){
 
@@ -88,29 +119,46 @@ filter_param(){
 
 generate_build_file(){
 
-    if [ ! -f $BUILD_FILE ] && [ -n "$1" ] && [ -w $(${DIRNAME} ${1}) ]; then
-        ${SED} -n "/^#.PROJECT\_BUILD\_FILE.*\#$/,/^#.*\#$/p" < $0 | ${SED} "/^#.PROJECT\_BUILD\_FILE.*\#$/,/^#.*\=$/d;/^#.*\#$/d;s/^#.//g;s/PROJECTNAME/$(${BASENAME} ${1})/;" > $BUILD_FILE
+    if [ -n "$1" ] && [ -n "$2" ] && [ ! -f $1/$BUILD_FILE ] && [ -w $(${DIRNAME} ${1}) ]; then
+        ${SED} -n "/^#.PROJECT\_BUILD\_FILE.*\#$/,/^#.*\#$/p" < $0 | ${SED} "/^#.PROJECT\_BUILD\_FILE.*\#$/,/^#.*\=$/d;/^#.*\#$/d;s/^#.//g;s/PROJECTNAME/$(${BASENAME} ${1})/;s/ORGNIZATION/${2}/;" > $1/$BUILD_FILE
     fi
 }
 
-create_project_with_name(){
+generate_main_class(){
 
-    if [ -n "$1" ];then
-        local project_name=$(filter_param $1);
-        if [ -n "$project_name" ] && [ ! -d $project_name ] && [ -w $(${DIRNAME} ${project_name}) ];then
+    if [ -n "$1" ] && [ -f $1 ] && [ -w $(${DIRNAME} ${1}) ]; then
+        project_name=$(echo $(${BASENAME} $1) | cut -d "." -f 1);
+        ${SED} -n "/^#.JAVA\_HERE.*\#$/,/^#.*\=$/p" < $0 | ${SED} "/^#.JAVA\_HERE.*\#$/,/^#.*\+$/d;/^#.*\=$/d;s/^#//g;s/PROJECTNAME/$project_name/;" >> $1
+    fi
+}
+
+create_java_project(){
+
+    if [ -n "$1" ] && [ -n "$2" ];then
+        local pname=$(filter_param $1);
+        local org=$(filter_param $2);
+        if [ -n "$pname" ] && [ -n "$org" ] && [ ! -d $pname ] && [ -w $(${DIRNAME} ${pname}) ];then
             # create project directory 
-            ${MD} $project_name
+            ${MD} $pname
 
-            cd $project_name
             # create src lib sub-directories
-            ${MD} ${CODE_DIR}
-            ${MD} ${LIBRARY_DIR}
+            ${MD} $pname/${LIBRARY_DIR}
+    
+            subdirs=$(echo ${org} | ${SED} -e "s/\./\//g");
+            ${MD} -p $pname/${CODE_DIR}/${subdirs}
+            ${MD} -p $pname/${TEST_DIR}/${subdirs}
+    
+            echo "package ${org};" > $pname/${CODE_DIR}/${subdirs}/$(${BASENAME} ${pname}).java
+            echo "package ${org};" > $pname/${TEST_DIR}/${subdirs}/$(${BASENAME} ${pname})Test.java
+
+            generate_main_class $pname/${CODE_DIR}/$subdirs/$(${BASENAME} ${pname}).java
+            generate_main_class $pname/${TEST_DIR}/$subdirs/$(${BASENAME} ${pname})Test.java
 
             # generate project build configure file: $BUILD_FILE
-            generate_build_file $project_name 
+            generate_build_file $pname $org
 
             if [ -x /usr/local/bin/tree ] || [ -x /usr/bin/tree ];then
-                tree .
+                tree $pname
             fi
         fi
     fi
@@ -120,7 +168,7 @@ usge_help(){
     echo "======================================================================="
     echo "=         Autonamic Create Java Project and Compile and Run           ="
     echo "======================================================================="
-    echo "=  create project : jant -n your_project_name                         ="
+    echo "=  create project : jant -n project_name  your_orgnization            ="
     echo "=  compile and run: jant                                              ="
     echo "=  show help info : jant -h                                           ="
     echo "======================================================================="
@@ -149,8 +197,8 @@ else
     if [ "$1" = "-h" ];then
         usge_help
     else
-        if [ "$1" = "-n" ] && [ -n "$2" ];then
-            create_project_with_name $2
+        if [ "$1" = "-n" ] && [ -n "$2" ] && [ -n "$3" ];then
+            create_java_project $2 $3
         fi
     fi
 fi
